@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Explorer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f0f0f0;
+    }
+
+    #header {
+      background-color: #333;
+      color: white;
+      padding: 10px;
+      text-align: center;
+    }
+
+    #yearSelector {
+      margin: 20px;
+      text-align: center;
+    }
+
+    #rollerDeck {
+      display: flex;
+      overflow-x: auto;
+      padding: 10px;
+      gap: 10px;
+    }
+
+    .movieCoverContainer {
+      position: relative;
+    }
+
+    .movieCover {
+      width: 150px;
+      height: 225px;
+      cursor: pointer;
+    }
+
+    .playButton {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 50px;
+      height: 50px;
+      background-color: #fff;
+      border: 2px solid #333;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      z-index: 1;
+    }
+
+    #trailer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 400px;
+      position: relative;
+    }
+
+    #youtubeTrailer {
+      max-width: 80%; /* Adjust the width as needed */
+      max-height: 80%; /* Adjust the height as needed */
+      width: 100%;
+      height: 100%;
+    }
+
+    #retroTVOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 400px; /* Same height as the YouTube player */
+      display: none;
+    }
+
+    #loadingSpinner {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <h1>Movie Explorer</h1>
+  </div>
+
+  <div id="yearSelector">
+    <label for="year">Select a year: </label>
+    <input type="number" id="year" min="1900" max="2023">
+    <button onclick="fetchMovies()">Go</button>
+  </div>
+
+  <div id="loadingSpinner">
+    <img src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/0.16.1/images/loader-large.gif" alt="Loading..." width="50">
+  </div>
+
+  <div id="rollerDeck"></div>
+
+  <div id="trailer">
+    <iframe id="youtubeTrailer" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>
+    <img id="retroTVOverlay" src="Retrotv2.png" alt="Retro TV Overlay">
+  </div>
+
+  <script>
+    async function fetchMovies() {
+      const year = document.getElementById("year").value;
+      showLoadingSpinner();
+      const response = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=194d885d6be15594b97e2d1f3b2526be&primary_release_year=${year}&region=US,GB&language=en-US&page=1`);
+      const data = await response.json();
+      const totalPages = data.total_pages;
+      const movies = await fetchAllMovies(year, totalPages);
+      hideLoadingSpinner();
+      displayMovies(movies);
+    }
+
+    async function fetchAllMovies(year, totalPages) {
+      let movies = [];
+
+      for (let page = 1; page <= totalPages; page++) {
+        const response = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=194d885d6be15594b97e2d1f3b2526be&primary_release_year=${year}&region=US,GB&language=en-US&page=${page}`);
+        const data = await response.json();
+        movies = movies.concat(data.results);
+      }
+
+      return movies;
+    }
+
+    function displayMovies(movies) {
+      const rollerDeck = document.getElementById("rollerDeck");
+      rollerDeck.innerHTML = "";
+      
+      movies.forEach(movie => {
+        const coverContainer = document.createElement("div");
+        coverContainer.classList.add("movieCoverContainer");
+
+        const cover = document.createElement("img");
+        cover.src = `https://image.tmdb.org/t/p/w500/${movie.poster_path}`;
+        cover.alt = movie.title;
+        cover.classList.add("movieCover");
+        cover.addEventListener("click", () => playTrailer(movie.id));
+
+        const playButton = document.createElement("div");
+        playButton.classList.add("playButton");
+        playButton.innerHTML = "&#9654;";
+        playButton.addEventListener("click", () => playExternalLink(movie.id));
+
+        coverContainer.appendChild(cover);
+        coverContainer.appendChild(playButton);
+        rollerDeck.appendChild(coverContainer);
+      });
+    }
+
+    function playTrailer(movieId) {
+      const trailer = document.getElementById("trailer");
+      const youtubeTrailer = document.getElementById("youtubeTrailer");
+      const retroTVOverlay = document.getElementById("retroTVOverlay");
+
+      trailer.style.display = "block";
+      retroTVOverlay.style.display = "block";
+
+      getYouTubeTrailer(movieId).then(key => {
+        youtubeTrailer.src = `https://www.youtube.com/embed/${key}?autoplay=1`;
+      });
+    }
+
+    function playExternalLink(movieId) {
+      window.open(`https://multiembed.mov/directstream.php?video_id=${movieId}&tmdb=1`, '_blank');
+    }
+
+    async function getYouTubeTrailer(movieId) {
+      const response = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=194d885d6be15594b97e2d1f3b2526be&language=en-US`);
+      const data = await response.json();
+      const trailer = data.results.find(video => video.type === "Trailer" && video.site === "YouTube");
+      return trailer ? trailer.key : "";
+    }
+
+    function showLoadingSpinner() {
+      document.getElementById("loadingSpinner").style.display = "block";
+    }
+
+    function hideLoadingSpinner() {
+      document.getElementById("loadingSpinner").style.display = "none";
+    }
+  </script>
+</body>
+</html>
