@@ -36,6 +36,8 @@
         var poster = document.getElementById('poster');
         var movies = [];
         var currentMovie = 0;
+        var currentTrailer = 0;
+        var trailerDuration = 60000; // 1 minute in milliseconds
 
         function fetchMovies() {
             return fetch(`${baseUrl}/discover/movie?api_key=${apiKey}&region=US,GB&year=1985&page=${page}`)
@@ -46,29 +48,35 @@
                 });
         }
 
-        function fetchTrailer(movie) {
+        function fetchTrailers(movie) {
             return fetch(`${baseUrl}/movie/${movie.id}/videos?api_key=${apiKey}`)
                 .then(response => response.json())
                 .then(data => {
-                    var trailer = data.results.find(video => video.site === 'YouTube' && video.type === 'Trailer');
-                    if (trailer) {
-                        trailerPlayer.src = `https://www.youtube.com/embed/${trailer.key}?autoplay=1&mute=1&controls=0&showinfo=0`;
-                        poster.src = `https://image.tmdb.org/t/p/w500${movie.poster_path}`;
-                    } else {
-                        playNextTrailer();
-                    }
+                    return data.results.filter(video => video.site === 'YouTube' && video.type === 'Trailer');
                 });
         }
 
-        function playNextTrailer() {
-            if (currentMovie < movies.length) {
-                fetchTrailer(movies[currentMovie++]);
+        function playTrailer(trailers) {
+            if (currentTrailer < trailers.length) {
+                var trailer = trailers[currentTrailer++];
+                trailerPlayer.src = `https://www.youtube.com/embed/${trailer.key}?autoplay=1&mute=1&controls=0&showinfo=0`;
+                setTimeout(() => playTrailer(trailers), trailerDuration);
             } else {
-                fetchMovies().then(playNextTrailer);
+                playNextMovie();
             }
         }
 
-        fetchMovies().then(playNextTrailer);
+        function playNextMovie() {
+            if (currentMovie < movies.length) {
+                var movie = movies[currentMovie++];
+                poster.src = `https://image.tmdb.org/t/p/w500${movie.poster_path}`;
+                fetchTrailers(movie).then(playTrailer);
+            } else {
+                fetchMovies().then(playNextMovie);
+            }
+        }
+
+        fetchMovies().then(playNextMovie);
     </script>
 </body>
 </html>
