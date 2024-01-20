@@ -68,7 +68,9 @@
             }
         }
 
-        trailerPlayer.addEventListener('ended', playNextTrailer);
+        trailerPlayer.addEventListener('ended', function() {
+            location.reload();
+        });
         fetchMovies().then(playNextTrailer);
     </script>
 </body>
