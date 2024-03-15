@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sky EPG</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: black;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #video-background {
+      flex-grow: 1;
+      width: 100%;
+      object-fit: cover;
+    }
+    .channel-info {
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .channel-info h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+    .channel-info img {
+      height: 40px;
+      margin-right: 10px;
+    }
+    .controls {
+      background-color: #333;
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    button {
+      background-color: #666;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+      text-decoration: none;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 0 5px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+    button:hover {
+      background-color: #999;
+    }
+    #setup-menu {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.9);
+      padding: 20px;
+      text-align: center;
+      display: none;
+    }
+    #setup-menu input[type="text"] {
+      padding: 10px;
+      font-size: 16px;
+      width: 300px;
+    }
+    #setup-menu button {
+      margin-top: 10px;
+    }
+    #clock {
+      color: #fff;
+      font-size: 18px;
+      margin-right: 10px;
+    }
+    #teletext-modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.9);
+    }
+    #teletext-modal-content {
+      background-color: #fefefe;
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 800px;
+    }
+    #teletext-modal-close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    #teletext-modal-close:hover,
+    #teletext-modal-close:focus {
+      color: black;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    #teletext-iframe {
+      width: 100%;
+      height: 500px;
+    }
+  </style>
+</head>
+<body>
+  <video id="video-background" autoplay></video>
+  <div class="channel-info">
+    <div>
+      <img id="channel-logo" src="" alt="Channel Logo">
+      <h2 id="channel-name"></h2>
+    </div>
+    <div id="clock"></div>
+  </div>
+  <div class="controls">
+    <button id="channel-down">&#9664; Previous</button>
+    <div>
+      <button id="setup-btn">Setup</button>
+      <button id="channel-up">Next &#9654;</button>
+      <button id="teletext-btn">Teletext</button>
+    </div>
+  </div>
+
+  <div id="setup-menu">
+    <h3>Setup</h3>
+    <input type="text" id="playlist-url" placeholder="Enter M3U8 playlist URL">
+    <button id="save-btn">Save</button>
+  </div>
+
+  <div id="teletext-modal">
+    <div id="teletext-modal-content">
+      <span id="teletext-modal-close">&times;</span>
+      <iframe id="teletext-iframe" src="https://www.nathanmediaservices.co.uk/ceefax/"></iframe>
+    </div>
+  </div>
+
+  <script>
+    let playlistUrl = 'https://i.mjh.nz/PlutoTV/all.m3u8';
+    let channels = [];
+    let currentChannelIndex = 0;
+
+    function fetchPlaylist() {
+      fetch(playlistUrl)
+        .then(response => response.text())
+        .then(data => parsePlaylist(data))
+        .catch(error => console.error('Error fetching playlist:', error));
+    }
+
+    function parsePlaylist(playlistData) {
+      const channelRegex = /#EXTINF:(.+?),(.*?)\n(.*?)\n/g;
+      const matches = [...playlistData.matchAll(channelRegex)];
+
+      channels = matches.map(match => {
+        const [, metadata, channelName, channelUrl] = match;
+        const logoUrl = metadata.split('tvg-logo="')[1]?.split('"')[0];
+        return { name: channelName.trim(), logoUrl, url: channelUrl.trim() };
+      });
+
+      setChannel(currentChannelIndex);
+    }
+
+    function setChannel(index) {
+      const videoElement = document.getElementById('video-background');
+      const channelNameElement = document.getElementById('channel-name');
+      const channelLogoElement = document.getElementById('channel-logo');
+
+      const channelUrl = channels[index].url;
+      videoElement.src = channelUrl;
+      videoElement.play();
+      channelNameElement.textContent = channels[index].name;
+      channelLogoElement.src = channels[index].logoUrl || '';
+    }
+
+    const channelUpButton = document.getElementById('channel-up');
+    const channelDownButton = document.getElementById('channel-down');
+
+    channelUpButton.addEventListener('click', () => {
+      currentChannelIndex = (currentChannelIndex + 1) % channels.length;
+      setChannel(currentChannelIndex);
+    });
+
+    channelDownButton.addEventListener('click', () => {
+      currentChannelIndex = (currentChannelIndex - 1 + channels.length) % channels.length;
+      setChannel(currentChannelIndex);
+    });
+
+    const setupBtn = document.getElementById('setup-btn');
+    const setupMenu = document.getElementById('setup-menu');
+    const playlistUrlInput = document.getElementById('playlist-url');
+    const saveBtn = document.getElementById('save-btn');
+
+    setupBtn.addEventListener('click', () => {
+      setupMenu.style.display = 'block';
+      playlistUrlInput.value = playlistUrl;
+    });
+
+    saveBtn.addEventListener('click', () => {
+      const newPlaylistUrl = playlistUrlInput.value;
+      if (newPlaylistUrl) {
+        playlistUrl = newPlaylistUrl;
+        channels = [];
+        currentChannelIndex = 0;
+        fetchPlaylist();
+      }
+      setupMenu.style.display = 'none';
+    });
+
+    const teletextBtn = document.getElementById('teletext-btn');
+    const teletextModal = document.getElementById('teletext-modal');
+    const teletextModalClose = document.getElementById('teletext-modal-close');
+
+    teletextBtn.addEventListener('click', () => {
+      teletextModal.style.display = 'block';
+    });
+
+    teletextModalClose.addEventListener('click', () => {
+      teletextModal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (event) => {
+      if (event.target === teletextModal) {
+        teletextModal.style.display = 'none';
+      }
+    });
+
+    // Clock functionality
+    function updateClock() {
+      const clockElement = document.getElementById('clock');
+      const now = new Date();
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      clockElement.textContent = `${hours}:${minutes}`;
+    }
+
+    updateClock(); // Update clock on page load
+    setInterval(updateClock, 60000); // Update clock every minute
+
+    fetchPlaylist();
+  </script>
+</body>
+  </html>
